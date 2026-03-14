@@ -2,3 +2,7 @@
 Lib/
 Scripts/
 pyvenv.cfg
+discord_resources.json
+share/
+etc/
+src/__pycache__/
