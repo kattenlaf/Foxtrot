@@ -63,7 +63,6 @@ class Music(commands.Cog):
         self.bot = disco_bot
         print("bot is initialized for music")
 
-    # Todo still need to fix the joining here, getting an error - discord.errors.ConnectionClosed: Shard ID None WebSocket closed with 4017
     @commands.command()
     async def join(self, context, *, channel: discord.VoiceChannel):
         if context.voice_client is not None:
@@ -73,6 +72,14 @@ class Music(commands.Cog):
         vc = await channel.connect()
         print(vc)
         print("Joined")
+
+    @commands.command()
+    async def leave(self, context):
+        if context.voice_client is None:
+            await context.send("bot is currently not in a voice chat")
+            return
+        await context.voice_client.disconnect() # check documentation - https://discordpy.readthedocs.io/en/stable/api.html#discord.VoiceProtocol.disconnect
+        print("bot disconnected")
 
     @commands.command()
     async def play(self, ctx, *, query):
