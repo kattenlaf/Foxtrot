@@ -2,7 +2,8 @@ import discord
 from discord.ext import commands
 import constants
 import json
-import youtube_dl
+# import youtube_dl - old module
+import yt_dlp as youtube_dl
 import os
 import asyncio
 
@@ -58,6 +59,22 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(discord.FFmpegPCMAudio(filename, options='-vn'), data=data)
 
+class Events(commands.Cog):
+    def __init__(self, disco_bot):
+        self.bot = disco_bot
+        print("bot is initialized with events")
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        if before.channel is not None:
+            if after.channel is None:
+                print(f"{member.name} left {before.channel.name}")
+                voice_client = self.bot.voice_clients[0]
+                source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(constants.FAAAH))
+                voice_client.play(source, after=lambda e: print(f'Player error: {e}') if e else None)
+            else:
+                print(f"{member.name} left {before.channel.name} and went to {after.channel.name}")
+
 class Music(commands.Cog):
     def __init__(self, disco_bot):
         self.bot = disco_bot
@@ -68,10 +85,7 @@ class Music(commands.Cog):
         if context.voice_client is not None:
             print("context voice client is not none")
             return await context.voice_client.move_to(channel)
-        print("Joining")
         vc = await channel.connect()
-        print(vc)
-        print("Joined")
 
     @commands.command()
     async def leave(self, context):
@@ -84,8 +98,10 @@ class Music(commands.Cog):
     @commands.command()
     async def play(self, ctx, *, query):
         """Plays a file from the local filesystem"""
+        true_query = f"{constants.LOCAL_SOUNDS}\\{query}.mp3"
+        print(true_query)
 
-        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(query))
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(true_query))
         ctx.voice_client.play(source, after=lambda e: print(f'Player error: {e}') if e else None)
 
         await ctx.send(f'Now playing: {query}')
@@ -162,6 +178,7 @@ async def on_ready(self):
 async def main():
     async with disco_bot:
         await disco_bot.add_cog(Music(disco_bot))
+        await disco_bot.add_cog(Events(disco_bot))
         await disco_bot.start(token)
 
 if __name__ == '__main__':
