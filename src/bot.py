@@ -70,10 +70,21 @@ class Events(commands.Cog):
             if after.channel is None:
                 print(f"{member.name} left {before.channel.name}")
                 voice_client = self.bot.voice_clients[0]
-                source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(constants.FAAAH))
-                voice_client.play(source, after=lambda e: print(f'Player error: {e}') if e else None)
+                if voice_client:
+                    await self.play_sound(voice_client, constants.FAAAH)
+                    return
             else:
                 print(f"{member.name} left {before.channel.name} and went to {after.channel.name}")
+        if after.channel is not None:
+            print(after.channel.name)
+            voice_client = self.bot.voice_clients[0]
+            if voice_client.channel.id == after.channel.id:
+                await self.play_sound(voice_client, constants.ALERT)
+
+    async def play_sound(self, voice_client, sound_to_play):
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(sound_to_play))
+        voice_client.play(source, after=lambda e: print(f'Player error: {e}') if e else None)
+
 
 class Music(commands.Cog):
     def __init__(self, disco_bot):
