@@ -6,6 +6,7 @@ import json
 import yt_dlp as youtube_dl
 import os
 import asyncio
+from pathlib import Path
 
 def GetResources():
     file_abs_path = os.path.abspath(os.path.dirname(__file__))
@@ -15,8 +16,39 @@ def GetResources():
         resources_data = json.loads(file_data)
     return resources_data
 
+def UpdateResources(file_data):
+    file_abs_path = os.path.abspath(os.path.dirname(__file__))
+    resources_path = os.path.join(file_abs_path, '..', constants.DISCORD_RESOURCES)
+    with open(resources_path, 'w') as file:
+        json.dump(file_data, file, indent=4)
+
 def GetBotToken(resources):
     return resources[constants.TOKEN]
+
+# Todo validate this works
+def GetMemberSoundFromResources(resources, member_name):
+    profiles = resources[constants.MEMBER_PROFILES]
+    if member_name in profiles:
+        member_profile = profiles[member_name]
+        sound = member_profile[constants.MEMBER_PROFILE_SOUND]
+        sound_to_play = constants.SOUNDS_AVAILABLE[sound]
+        file_path = Path(sound_to_play)
+        if not file_path.exists():
+            sound_to_play = constants.SOUNDS_AVAILABLE[constants.DEFAULT]
+        return sound_to_play
+    else:
+        # Todo create new user profile
+        new_profile = {
+            member_name: {
+                constants.JSON_SOUND: constants.DEFAULT
+            }
+        }
+        sound_to_play = constants.SOUNDS_AVAILABLE[constants.DEFAULT]
+        profiles.update(new_profile)
+        UpdateResources(resources)
+        return sound_to_play
+
+
 
 # Example taken from - https://github.com/Rapptz/discord.py/blob/master/examples/basic_voice.py
 # Suppress noise about console usage from errors
@@ -36,10 +68,11 @@ ytdl_format_options = {
     'source_address': '0.0.0.0',  # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
+
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
 class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
+    def __init__(self, source, *, data, volume=constants.DEFAULT_VOLUME):
         super().__init__(source, volume)
 
         self.data = data
@@ -69,9 +102,12 @@ class Events(commands.Cog):
         if before.channel is not None:
             if after.channel is None:
                 print(f"{member.name} left {before.channel.name}")
+                print(self.bot.voice_clients)
                 voice_client = self.bot.voice_clients[0]
                 if voice_client:
-                    await self.play_sound(voice_client, constants.FAAAH)
+                    sound_to_play = GetMemberSoundFromResources(resources, member.name)
+                    print(sound_to_play)
+                    await self.play_sound(voice_client, sound_to_play)
                     return
             else:
                 print(f"{member.name} left {before.channel.name} and went to {after.channel.name}")
@@ -79,11 +115,18 @@ class Events(commands.Cog):
             print(after.channel.name)
             voice_client = self.bot.voice_clients[0]
             if voice_client.channel.id == after.channel.id:
+                # Todo, add entrance sound as part of profile?
                 await self.play_sound(voice_client, constants.ALERT)
 
     async def play_sound(self, voice_client, sound_to_play):
         source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(sound_to_play))
         voice_client.play(source, after=lambda e: print(f'Player error: {e}') if e else None)
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        print(message.author)
+        if len(message.content) < constants.CHECK_MESSAGE_LIMIT and message.content.find("remind him jarvis") != -1:
+            await message.channel.send("you lame")
 
 
 class Music(commands.Cog):
