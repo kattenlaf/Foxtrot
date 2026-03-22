@@ -25,13 +25,16 @@ def UpdateResources(file_data):
 def GetBotToken(resources):
     return resources[constants.TOKEN]
 
-# Todo validate this works
-def GetMemberSoundFromResources(resources, member_name):
+# Summary
+# resources is the json file with the metadata needed for the bot, json_dict
+# member_name is the name of the user's profile we want to check, string
+# sound type denotes what type of sound we want to get for the user, int
+def GetMemberSoundFromResources(resources, member_name, sound_type_val):
     profiles = resources[constants.MEMBER_PROFILES]
     if member_name in profiles:
         member_profile = profiles[member_name]
-        sound = member_profile[constants.MEMBER_PROFILE_SOUND]
-        sound_to_play = constants.SOUNDS_AVAILABLE[sound]
+        sound_type = constants.SOUND_TYPES[sound_type_val]
+        sound_to_play = constants.SOUNDS_AVAILABLE[member_profile[sound_type]]
         file_path = Path(sound_to_play)
         if not file_path.exists():
             sound_to_play = constants.SOUNDS_AVAILABLE[constants.DEFAULT]
@@ -44,7 +47,7 @@ def GetMemberSoundFromResources(resources, member_name):
             }
         }
         sound_to_play = constants.SOUNDS_AVAILABLE[constants.DEFAULT]
-        profiles.update(new_profile)
+        profiles.update(new_profile) # Save to the file
         UpdateResources(resources)
         return sound_to_play
 
@@ -105,18 +108,23 @@ class Events(commands.Cog):
                 print(self.bot.voice_clients)
                 voice_client = self.bot.voice_clients[0]
                 if voice_client:
-                    sound_to_play = GetMemberSoundFromResources(resources, member.name)
-                    print(sound_to_play)
+                    sound_to_play = GetMemberSoundFromResources(resources, member.name, constants.SOUND_TYPE_EXIT)
+                    print(f"{member.name} entrance track is {sound_to_play}")
                     await self.play_sound(voice_client, sound_to_play)
                     return
             else:
                 print(f"{member.name} left {before.channel.name} and went to {after.channel.name}")
         if after.channel is not None:
-            print(after.channel.name)
-            voice_client = self.bot.voice_clients[0]
-            if voice_client.channel.id == after.channel.id:
-                # Todo, add entrance sound as part of profile?
-                await self.play_sound(voice_client, constants.ALERT)
+            # User has altered their voice state within the voice channel itself, i.e. streaming, deafen, mute
+            if before.channel is not None and before.channel.id == after.channel.id:
+                # User is streaming
+                print('user altered their voice state a different way')
+            else:
+                voice_client = self.bot.voice_clients[0]
+                if voice_client.channel.id == after.channel.id:
+                    sound_to_play = GetMemberSoundFromResources(resources, member.name, constants.SOUND_TYPE_ENTER)
+                    print(f"{member.name} exit track is {sound_to_play}")
+                    await self.play_sound(voice_client, sound_to_play)
 
     async def play_sound(self, voice_client, sound_to_play):
         source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(sound_to_play))
